@@ -18,6 +18,11 @@ class Settings:
     search_api_url: str = os.getenv("SEARCH_API_URL", "https://api.tavily.com/search")
     resume_path: Path = Path(os.getenv("RESUME_PATH", str(BASE_DIR / "data" / "resume.pdf")))
     database_path: Path = Path(os.getenv("DATABASE_PATH", str(BASE_DIR / "data" / "internship_tracker.db")))
+    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    claude_model: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5")
+    hunter_api_key: str = os.getenv("HUNTER_API_KEY", "")
+    google_client_secret: Path = Path(os.getenv("GOOGLE_CLIENT_SECRET_FILE", str(BASE_DIR / "credentials.json")))
+    google_token: Path = Path(os.getenv("GOOGLE_TOKEN_FILE", str(BASE_DIR / "token.json")))
 
 
 settings = Settings()

@@ -1,13 +1,14 @@
 # Personal AI Internship Outreach Automation
 
-This is a deliberately small, personal tool. The first slice discovers real companies through Tavily and stores deduplicated results in a local SQLite database. It does not send email and it does not invent contact details.
+This is a deliberately small, personal tool. It discovers real companies through Tavily, finds optional recruiting contacts through Hunter, uses Claude to write drafts from your resume, and creates Gmail drafts for your approval. It never sends email automatically and never invents contact details.
 
 ## Minimum viable architecture
 
 1. Search provider: Tavily returns web results for internship and software-engineering queries.
 2. Local tracker: SQLite keeps a durable, single-user record without a database server.
-3. Later integrations: Claude writes drafts; Gmail creates drafts and sends only after approval; Google Sheets can become an export/view once the workflow is stable.
-4. Interface: start with the CLI. Add Streamlit only after discovery and draft review work end-to-end.
+3. Claude: reads the resume and supplied company/contact data, then returns two grounded email variants.
+4. Gmail: OAuth creates drafts with the resume attached. Sending is a separate explicit action in Gmail.
+5. Interface: `app.py` is a small Streamlit dashboard; the CLI remains available for discovery.
 
 The resume is intentionally read from `RESUME_PATH`; no resume file was present in the supplied workspace, so the application currently makes no claims about qualifications beyond data you later provide.
 
@@ -20,15 +21,17 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 # Add SEARCH_API_KEY to .env
 python main.py --count 10
+# or
+streamlit run app.py
 ```
 
 If the key is missing, the command prints a short setup message and exits without changing the tracker.
 
-Tavily has a free tier that is suitable for development, but check its current pricing before regular use. The code keeps the provider behind one function so a different search API can be added without changing tracking or future email code.
+Add your resume at `data/resume.pdf`, add `ANTHROPIC_API_KEY`, and optionally add `HUNTER_API_KEY`. For Gmail, create a Google Cloud OAuth desktop credential JSON, save it as `credentials.json`, and complete the browser login the first time you create a draft.
 
 ## Safety boundaries
 
 - Search results are source URLs, not verified facts; compensation must be researched and recorded separately.
-- No email addresses are generated. Contact discovery and verification will be a separate phase.
-- Gmail sending will remain approval-gated; the initial implementation has no Gmail permissions.
+- Email addresses come only from Hunter and are shown with their verification status.
+- Gmail draft creation uses OAuth; sending is never automatic.
 - API keys belong only in `.env`, which should not be committed.
