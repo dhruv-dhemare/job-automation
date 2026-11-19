@@ -19,6 +19,14 @@ TARGET_ROLES = (
     "java developer intern",
 )
 
+TARGET_LOCATIONS = ("Bangalore", "Bengaluru", "Pune", "remote")
+EXCLUDED_DOMAINS = {
+    "indeed.com", "linkedin.com", "glassdoor.com", "handshake.com", "wayup.com",
+    "ziprecruiter.com", "simplify.jobs", "remotive.com", "wantjob.in", "hiredoor.in",
+    "wellfound.com", "internshala.com", "naukri.com", "cutshort.io", "instahyre.com",
+    "remoteok.com", "weworkremotely.com", "jooble.org", "talent.com", "monster.com",
+}
+
 
 @dataclass
 class Company:
@@ -62,11 +70,11 @@ def _score(text: str) -> tuple[int, str]:
     return min(points, 100), ", ".join(reasons) or "matches the search query"
 
 
-def _query(count: int) -> str:
+def _query(location: str) -> str:
     roles = " OR ".join(f'"{role}"' for role in TARGET_ROLES[:4])
     return (
-        f"({roles}) internship India OR remote software company hiring "
-        f"2027 -course -training"
+        f"({roles}) {location} official company careers jobs "
+        "software product fintech SaaS startup -job-board -aggregator -course -training"
     )
 
 
@@ -80,32 +88,39 @@ def discover_companies(count: int = 10) -> list[Company]:
     if settings.search_provider.lower() != "tavily":
         raise RuntimeError(f"Unsupported SEARCH_PROVIDER: {settings.search_provider}")
 
-    response = requests.post(
-        settings.search_api_url,
-        headers={"Content-Type": "application/json"},
-        json={
-            "api_key": settings.search_api_key,
-            "query": _query(count),
-            "search_depth": "advanced",
-            "max_results": max(count * 3, 10),
-            "include_answer": False,
-        },
-        timeout=30,
-    )
-    response.raise_for_status()
-    raw_results = response.json().get("results", [])
+    raw_results = []
+    for location in TARGET_LOCATIONS:
+        response = requests.post(
+            settings.search_api_url,
+            headers={"Content-Type": "application/json"},
+            json={
+                "api_key": settings.search_api_key,
+                "query": _query(location),
+                "search_depth": "advanced",
+                "max_results": max(count, 5),
+                "include_answer": False,
+                "exclude_domains": sorted(EXCLUDED_DOMAINS),
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        raw_results.extend(response.json().get("results", []))
 
     companies: list[Company] = []
     seen_domains: set[str] = set()
     for result in raw_results:
         url = result.get("url", "")
         domain = _domain(url)
-        if not domain or domain in seen_domains:
+        if not domain or any(domain == blocked or domain.endswith("." + blocked) for blocked in EXCLUDED_DOMAINS):
+            continue
+        if domain in seen_domains:
             continue
         seen_domains.add(domain)
         title = result.get("title", "").strip()
         content = result.get("content", "").strip()
         score, reason = _score(f"{title} {content}")
+        if not any(word in f"{url} {title} {content}".lower() for word in ("career", "jobs", "intern", "engineering")):
+            continue
         companies.append(
             Company(
                 name=title or domain,
