@@ -110,7 +110,7 @@ def _available_gemini_model(requests_module: Any) -> str:
         for item in response.json().get("models", [])
         if "generateContent" in item.get("supportedGenerationMethods", [])
     }
-    preferences = [settings.gemini_model, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    preferences = [settings.gemini_model, "gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
     for model in preferences:
         if model in available:
             return model
