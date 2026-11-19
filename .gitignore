@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.py[cod]
+data/*.db
+data/*.sqlite
+data/resume.pdf
