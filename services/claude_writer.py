@@ -134,14 +134,35 @@ def _generate_with_ollama(company: dict[str, Any], contact: dict[str, Any], resu
         raise RuntimeError("Ollama is not running. Install Ollama, run `ollama serve`, and pull the configured model.") from error
     if not response.ok:
         raise RuntimeError(f"Ollama request failed ({response.status_code}): {response.text[:300]}")
-    try:
-        result = json.loads(response.json().get("response", ""))
-    except json.JSONDecodeError as error:
-        raise RuntimeError("Ollama returned invalid JSON; try again.") from error
+    raw = response.json().get("response", "").strip()
+    result = _parse_json_or_text(raw)
     required = {"professional_subject", "professional_body", "technical_subject", "technical_body"}
     if not required.issubset(result):
-        raise RuntimeError("Ollama response was missing required email fields.")
+        company_name = company.get("name", "the company")
+        body = raw.strip() or "I would appreciate the opportunity to discuss a software engineering internship."
+        result = {
+            "professional_subject": f"Software Engineering Internship Inquiry - {company_name}",
+            "professional_body": body,
+            "technical_subject": f"Software Engineering Internship - {company_name}",
+            "technical_body": body,
+        }
     return {key: str(result[key]).strip() for key in required}
+
+
+def _parse_json_or_text(raw: str) -> dict[str, Any]:
+    cleaned = raw.replace("```json", "").replace("```", "").strip()
+    try:
+        result = json.loads(cleaned)
+        return result if isinstance(result, dict) else {}
+    except json.JSONDecodeError:
+        start, end = cleaned.find("{"), cleaned.rfind("}")
+        if start >= 0 and end > start:
+            try:
+                result = json.loads(cleaned[start : end + 1])
+                return result if isinstance(result, dict) else {}
+            except json.JSONDecodeError:
+                pass
+    return {}
 
 
 def _post_with_retry(requests_module: Any, model: str, payload: dict[str, Any]) -> Any:
