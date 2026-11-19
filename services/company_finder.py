@@ -37,6 +37,10 @@ LISTING_PHRASES = (
     "curated list", "directory", "salary", "services areas", "position closed",
     "jobs, salaries", "hiring guide", "companies based in",
 )
+DISCOVERY_ONLY_DOMAINS = {
+    "linkedin.com", "wellfound.com", "builtin.com", "github.com", "yourstory.com",
+    "inc42.com", "tracxn.com", "startup-talky.com", "analyticsinsight.net",
+}
 
 
 def _is_direct_company_result(url: str, title: str, content: str) -> bool:
@@ -99,6 +103,46 @@ def _query(location: str) -> str:
     )
 
 
+def _lead_queries() -> tuple[str, ...]:
+    return (
+        "site:linkedin.com/company software startup Bangalore OR Bengaluru",
+        "site:linkedin.com/company fintech SaaS startup Pune",
+        "site:wellfound.com/company software startup India remote",
+    )
+
+
+def _candidate_name(title: str) -> str:
+    cleaned = re.split(r"\s+(?:\||-|–)\s+", title, maxsplit=1)[0].strip()
+    if not cleaned or any(phrase in cleaned.lower() for phrase in LISTING_PHRASES):
+        return ""
+    return cleaned
+
+
+def _resolve_official_website(name: str) -> tuple[str, str, str] | None:
+    response = requests.post(
+        settings.search_api_url,
+        headers={"Content-Type": "application/json"},
+        json={
+            "api_key": settings.search_api_key,
+            "query": f'"{name}" official company website',
+            "search_depth": "basic",
+            "max_results": 5,
+            "include_answer": False,
+            "exclude_domains": sorted(EXCLUDED_DOMAINS),
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    for result in response.json().get("results", []):
+        url = result.get("url", "")
+        domain = _domain(url)
+        title = result.get("title", "").strip()
+        content = result.get("content", "").strip()
+        if domain and not any(domain == blocked or domain.endswith("." + blocked) for blocked in EXCLUDED_DOMAINS) and _is_direct_company_result(url, title, content):
+            return domain, url, content
+    return None
+
+
 def discover_companies(count: int = 10) -> list[Company]:
     """Return real search results. Raises a useful error if the provider is not configured."""
     if not settings.search_api_key:
@@ -126,6 +170,24 @@ def discover_companies(count: int = 10) -> list[Company]:
         )
         response.raise_for_status()
         raw_results.extend(response.json().get("results", []))
+
+    lead_results = []
+    for query in _lead_queries():
+        response = requests.post(
+            settings.search_api_url,
+            headers={"Content-Type": "application/json"},
+            json={
+                "api_key": settings.search_api_key,
+                "query": query,
+                "search_depth": "basic",
+                "max_results": max(count, 5),
+                "include_answer": False,
+                "exclude_domains": sorted(EXCLUDED_DOMAINS - DISCOVERY_ONLY_DOMAINS),
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        lead_results.extend(response.json().get("results", []))
 
     companies: list[Company] = []
     seen_domains: set[str] = set()
@@ -159,5 +221,27 @@ def discover_companies(count: int = 10) -> list[Company]:
                 match_reason=reason,
             )
         )
+
+    # Use LinkedIn/startup-list pages only to discover a name, then resolve the
+    # name to an official website before exposing it to Hunter.
+    for result in lead_results:
+        source_url = result.get("url", "")
+        source_domain = _domain(source_url)
+        if not any(source_domain == allowed or source_domain.endswith("." + allowed) for allowed in DISCOVERY_ONLY_DOMAINS):
+            continue
+        name = _candidate_name(result.get("title", ""))
+        if not name:
+            continue
+        resolved = _resolve_official_website(name)
+        if not resolved:
+            continue
+        domain, official_url, content = resolved
+        if domain in seen_domains:
+            continue
+        seen_domains.add(domain)
+        score, reason = _score(f"{name} {content}")
+        companies.append(Company(name=name, website=f"https://{domain}", careers_url=official_url, description=content[:500], relevant_opening="Direct company outreach", source_url=source_url, match_score=score, match_reason=f"resolved from {source_domain} lead; {reason}"))
+        if len(companies) >= count * 2:
+            break
 
     return sorted(companies, key=lambda item: item.match_score, reverse=True)[:count]
