@@ -27,7 +27,7 @@ streamlit run app.py
 
 If the key is missing, the command prints a short setup message and exits without changing the tracker.
 
-Add your resume at `data/resume.pdf`, add `GEMINI_API_KEY`, and optionally add `HUNTER_API_KEY`. Gemini API keys can be created in [Google AI Studio](https://aistudio.google.com/app/apikey); its free tier is subject to current rate limits. To use Claude instead, set `AI_PROVIDER=claude` and add `ANTHROPIC_API_KEY`. For Gmail, create a Google Cloud OAuth desktop credential JSON, save it as `credentials.json`, and complete the browser login the first time you create a draft.
+Add your resume at `data/resume.pdf`, add `GEMINI_API_KEY`, and optionally add `HUNTER_API_KEY`. Gemini API keys can be created in [Google AI Studio](https://aistudio.google.com/app/apikey); its free tier is subject to current rate limits. The app checks which Gemini models your key can call and selects an available one automatically. To use Claude instead, set `AI_PROVIDER=claude` and add `ANTHROPIC_API_KEY`. For Gmail, create a Google Cloud OAuth desktop credential JSON, save it as `credentials.json`, and complete the browser login the first time you create a draft.
 
 ## Safety boundaries
 

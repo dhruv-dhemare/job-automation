@@ -72,8 +72,9 @@ def _generate_with_gemini(company: dict[str, Any], contact: dict[str, Any], resu
         raise RuntimeError("GEMINI_API_KEY is missing from .env")
     import requests
 
+    model = _available_gemini_model(requests)
     response = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent",
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         params={"key": settings.gemini_api_key},
         json={
             "contents": [{"parts": [{"text": _prompt(company, contact, resume)}]}],
@@ -81,7 +82,8 @@ def _generate_with_gemini(company: dict[str, Any], contact: dict[str, Any], resu
         },
         timeout=60,
     )
-    response.raise_for_status()
+    if not response.ok:
+        raise RuntimeError(f"Gemini request failed ({response.status_code}): {response.text[:500]}")
     candidates = response.json().get("candidates", [])
     text = candidates[0]["content"]["parts"][0]["text"] if candidates else ""
     try:
@@ -92,3 +94,26 @@ def _generate_with_gemini(company: dict[str, Any], contact: dict[str, Any], resu
     if not required.issubset(result):
         raise RuntimeError("Gemini response was missing required email fields.")
     return {key: str(result[key]).strip() for key in required}
+
+
+def _available_gemini_model(requests_module: Any) -> str:
+    """Choose a model the current key can actually call."""
+    response = requests_module.get(
+        "https://generativelanguage.googleapis.com/v1beta/models",
+        params={"key": settings.gemini_api_key},
+        timeout=30,
+    )
+    if not response.ok:
+        raise RuntimeError(f"Could not list Gemini models ({response.status_code}): {response.text[:500]}")
+    available = {
+        item["name"].removeprefix("models/")
+        for item in response.json().get("models", [])
+        if "generateContent" in item.get("supportedGenerationMethods", [])
+    }
+    preferences = [settings.gemini_model, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    for model in preferences:
+        if model in available:
+            return model
+    if available:
+        return sorted(available)[0]
+    raise RuntimeError("This Gemini API key has no model that supports generateContent.")
