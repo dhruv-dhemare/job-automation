@@ -125,24 +125,48 @@ def _available_gemini_model(requests_module: Any) -> str:
 def _generate_with_ollama(company: dict[str, Any], contact: dict[str, Any], resume: str) -> dict[str, str]:
     import requests
 
+    professional = _ollama_text_request(
+        requests,
+        f"""Write one concise professional internship outreach email as plain text.
+Candidate resume: {resume}
+Company: {json.dumps(company, ensure_ascii=False)}
+Recipient: {json.dumps(contact, ensure_ascii=False)}
+Use only supplied facts. Mention one relevant candidate achievement, ask about a 2027 software engineering internship, and sign as Dhruv Dhemare. Include greeting and closing. Do not output JSON, labels, analysis, or a subject line.""",
+    )
+    technical = _ollama_text_request(
+        requests,
+        f"""Write one technical but natural internship outreach email as plain text.
+Candidate resume: {resume}
+Company: {json.dumps(company, ensure_ascii=False)}
+Recipient: {json.dumps(contact, ensure_ascii=False)}
+Use only supplied facts. Mention relevant technologies and one concrete achievement, ask about a 2027 software engineering internship, and sign as Dhruv Dhemare. Include greeting and closing. Do not output JSON, labels, analysis, or a subject line.""",
+    )
+    company_name = company.get("name", "the company")
+    return {
+        "professional_subject": f"Software Engineering Internship Inquiry - {company_name}",
+        "professional_body": professional,
+        "technical_subject": f"Technical Internship Inquiry - {company_name}",
+        "technical_body": technical,
+    }
+
+
+def _ollama_text_request(requests_module: Any, prompt: str) -> str:
     try:
-        session = requests.Session()
+        session = requests_module.Session()
         session.trust_env = False
         response = session.post(
             settings.ollama_url,
-            json={"model": settings.ollama_model, "prompt": _prompt(company, contact, resume), "format": "json", "stream": False, "options": {"temperature": 0.3, "num_predict": 500, "num_ctx": 4096}},
+            json={"model": settings.ollama_model, "prompt": prompt, "stream": False, "options": {"temperature": 0.3, "num_predict": 320, "num_ctx": 4096}},
             timeout=180,
         )
-    except requests.exceptions.RequestException as error:
+    except requests_module.exceptions.RequestException as error:
         raise RuntimeError(f"Could not connect to Ollama at {settings.ollama_url}: {error}") from error
     if not response.ok:
         raise RuntimeError(f"Ollama request failed ({response.status_code}): {response.text[:300]}")
-    raw = response.json().get("response", "").strip()
-    result = _parse_json_or_text(raw)
-    required = {"professional_subject", "professional_body", "technical_subject", "technical_body"}
-    if not required.issubset(result):
-        raise RuntimeError("Ollama did not return clean email fields. Please generate again; no draft was created.")
-    return {key: str(result[key]).strip() for key in required}
+    text = response.json().get("response", "").strip()
+    if not text:
+        raise RuntimeError("Ollama returned an empty email.")
+    return text
 
 
 def _parse_json_or_text(raw: str) -> dict[str, Any]:
