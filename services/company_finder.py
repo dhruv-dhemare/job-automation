@@ -28,7 +28,25 @@ EXCLUDED_DOMAINS = {
     "foundit.in", "foundit.com", "builtin.com", "timesjobs.com", "shine.com",
     "careerbuilder.com", "adzuna.com", "jobstreet.com", "dice.com", "remote.co",
     "himalayas.app", "startup.jobs", "freshersworld.com", "apna.co", "careerjet.com",
+    "github.com", "webneco.com", "yourstory.com", "inc42.com", "tracxn.com",
+    "ambitionbox.com", "startup-talky.com", "analyticsinsight.net",
 }
+
+LISTING_PHRASES = (
+    "top ", "list of", "companies in", "startups in", "you should know",
+    "curated list", "directory", "salary", "services areas", "position closed",
+    "jobs, salaries", "hiring guide", "companies based in",
+)
+
+
+def _is_direct_company_result(url: str, title: str, content: str) -> bool:
+    lowered_url = url.lower()
+    lowered_text = f"{title} {content}".lower()
+    if any(phrase in lowered_text for phrase in LISTING_PHRASES):
+        return False
+    if any(part in lowered_url for part in ("/blog/", "/article/", "/posts/", "/list/", "/tag/", "/wiki/")):
+        return False
+    return any(part in lowered_url for part in ("/about", "/company", "/career", "/jobs", "/join", "/contact")) or lowered_url.count("/") <= 3
 
 
 @dataclass
@@ -121,6 +139,8 @@ def discover_companies(count: int = 10) -> list[Company]:
         seen_domains.add(domain)
         title = result.get("title", "").strip()
         content = result.get("content", "").strip()
+        if not _is_direct_company_result(url, title, content):
+            continue
         generic_titles = {"careers", "jobs", "company", "about us", "software engineer jobs"}
         if title.lower() in generic_titles:
             title = domain.split(".")[0].replace("-", " ").replace("_", " ").title()
