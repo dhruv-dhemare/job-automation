@@ -42,6 +42,8 @@ def load_resume(path: Path | None = None) -> str:
 
 def generate_emails(company: dict[str, Any], contact: dict[str, Any], resume: str | None = None) -> dict[str, str]:
     resume = resume or load_resume()
+    if settings.ai_provider.lower() == "ollama":
+        return _generate_with_ollama(company, contact, resume)
     if settings.ai_provider.lower() == "gemini":
         return _generate_with_gemini(company, contact, resume)
     if not settings.anthropic_api_key:
@@ -117,6 +119,29 @@ def _available_gemini_model(requests_module: Any) -> str:
     if available:
         return sorted(available)[0]
     raise RuntimeError("This Gemini API key has no model that supports generateContent.")
+
+
+def _generate_with_ollama(company: dict[str, Any], contact: dict[str, Any], resume: str) -> dict[str, str]:
+    import requests
+
+    try:
+        response = requests.post(
+            settings.ollama_url,
+            json={"model": settings.ollama_model, "prompt": _prompt(company, contact, resume), "format": "json", "stream": False, "options": {"temperature": 0.3}},
+            timeout=180,
+        )
+    except requests.exceptions.RequestException as error:
+        raise RuntimeError("Ollama is not running. Install Ollama, run `ollama serve`, and pull the configured model.") from error
+    if not response.ok:
+        raise RuntimeError(f"Ollama request failed ({response.status_code}): {response.text[:300]}")
+    try:
+        result = json.loads(response.json().get("response", ""))
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Ollama returned invalid JSON; try again.") from error
+    required = {"professional_subject", "professional_body", "technical_subject", "technical_body"}
+    if not required.issubset(result):
+        raise RuntimeError("Ollama response was missing required email fields.")
+    return {key: str(result[key]).strip() for key in required}
 
 
 def _post_with_retry(requests_module: Any, model: str, payload: dict[str, Any]) -> Any:

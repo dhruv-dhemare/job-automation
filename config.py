@@ -23,6 +23,8 @@ class Settings:
     ai_provider: str = os.getenv("AI_PROVIDER", "gemini")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+    ollama_url: str = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
     hunter_api_key: str = os.getenv("HUNTER_API_KEY", "")
     google_client_secret: Path = Path(os.getenv("GOOGLE_CLIENT_SECRET_FILE", str(BASE_DIR / "credentials.json")))
     google_token: Path = Path(os.getenv("GOOGLE_TOKEN_FILE", str(BASE_DIR / "token.json")))
