@@ -72,7 +72,7 @@ def _generate_with_gemini(company: dict[str, Any], contact: dict[str, Any], resu
         raise RuntimeError("GEMINI_API_KEY is missing from .env")
     import requests
 
-    model = _available_gemini_model(requests)
+    model = settings.gemini_model
     response = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         params={"key": settings.gemini_api_key},
@@ -80,8 +80,19 @@ def _generate_with_gemini(company: dict[str, Any], contact: dict[str, Any], resu
             "contents": [{"parts": [{"text": _prompt(company, contact, resume)}]}],
             "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"},
         },
-        timeout=60,
+        timeout=120,
     )
+    if response.status_code == 404:
+        model = _available_gemini_model(requests)
+        response = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            params={"key": settings.gemini_api_key},
+            json={
+                "contents": [{"parts": [{"text": _prompt(company, contact, resume)}]}],
+                "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"},
+            },
+            timeout=120,
+        )
     if not response.ok:
         raise RuntimeError(f"Gemini request failed ({response.status_code}): {response.text[:500]}")
     candidates = response.json().get("candidates", [])
@@ -101,7 +112,7 @@ def _available_gemini_model(requests_module: Any) -> str:
     response = requests_module.get(
         "https://generativelanguage.googleapis.com/v1beta/models",
         params={"key": settings.gemini_api_key},
-        timeout=30,
+        timeout=20,
     )
     if not response.ok:
         raise RuntimeError(f"Could not list Gemini models ({response.status_code}): {response.text[:500]}")
