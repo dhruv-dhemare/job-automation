@@ -6,7 +6,7 @@ This is a deliberately small, personal tool. It discovers real companies through
 
 1. Search provider: Tavily returns web results for internship and software-engineering queries.
 2. Local tracker: SQLite keeps a durable, single-user record without a database server.
-3. Claude: reads the resume and supplied company/contact data, then returns two grounded email variants.
+3. AI writer: Gemini is the default low-cost provider and reads the resume plus supplied company/contact data, then returns two grounded email variants. Claude remains optional.
 4. Gmail: OAuth creates drafts with the resume attached. Sending is a separate explicit action in Gmail.
 5. Interface: `app.py` is a small Streamlit dashboard; the CLI remains available for discovery.
 
@@ -27,7 +27,7 @@ streamlit run app.py
 
 If the key is missing, the command prints a short setup message and exits without changing the tracker.
 
-Add your resume at `data/resume.pdf`, add `ANTHROPIC_API_KEY`, and optionally add `HUNTER_API_KEY`. For Gmail, create a Google Cloud OAuth desktop credential JSON, save it as `credentials.json`, and complete the browser login the first time you create a draft.
+Add your resume at `data/resume.pdf`, add `GEMINI_API_KEY`, and optionally add `HUNTER_API_KEY`. Gemini API keys can be created in [Google AI Studio](https://aistudio.google.com/app/apikey); its free tier is subject to current rate limits. To use Claude instead, set `AI_PROVIDER=claude` and add `ANTHROPIC_API_KEY`. For Gmail, create a Google Cloud OAuth desktop credential JSON, save it as `credentials.json`, and complete the browser login the first time you create a draft.
 
 ## Safety boundaries
 

@@ -11,7 +11,7 @@ from services.tracker import Tracker
 
 st.set_page_config(page_title="Internship Hunter", layout="wide")
 st.title("Personal Internship Hunter")
-st.caption("Discovery and draft preparation only. Gmail sending always requires your explicit click.")
+st.caption(f"AI provider: {settings.ai_provider}. Discovery and draft preparation only. Gmail sending always requires your explicit click.")
 
 tracker = Tracker(settings.database_path)
 try:

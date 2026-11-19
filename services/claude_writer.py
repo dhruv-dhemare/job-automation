@@ -7,24 +7,8 @@ from typing import Any
 from config import settings
 
 
-def load_resume(path: Path | None = None) -> str:
-    path = path or settings.resume_path
-    if not path.exists():
-        raise FileNotFoundError(f"Resume not found at {path}. Add your PDF or set RESUME_PATH in .env.")
-    if path.suffix.lower() == ".pdf":
-        from pypdf import PdfReader
-
-        return "\n".join(page.extract_text() or "" for page in PdfReader(path).pages).strip()
-    return path.read_text(encoding="utf-8").strip()
-
-
-def generate_emails(company: dict[str, Any], contact: dict[str, Any], resume: str | None = None) -> dict[str, str]:
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is missing from .env")
-    resume = resume or load_resume()
-    from anthropic import Anthropic
-
-    prompt = f"""You write truthful internship outreach emails.
+def _prompt(company: dict[str, Any], contact: dict[str, Any], resume: str) -> str:
+    return f"""You write truthful internship outreach emails.
 
 Candidate resume:
 {resume}
@@ -42,6 +26,28 @@ technology, relationship, compensation, or achievement. Ask whether there may
 be a 2027 software engineering internship or a suitable referral. Use a natural
 professional tone and a concise call to action. Sign as Dhruv Dhemare.
 """
+
+
+def load_resume(path: Path | None = None) -> str:
+    path = path or settings.resume_path
+    if not path.exists():
+        raise FileNotFoundError(f"Resume not found at {path}. Add your PDF or set RESUME_PATH in .env.")
+    if path.suffix.lower() == ".pdf":
+        from pypdf import PdfReader
+
+        return "\n".join(page.extract_text() or "" for page in PdfReader(path).pages).strip()
+    return path.read_text(encoding="utf-8").strip()
+
+
+def generate_emails(company: dict[str, Any], contact: dict[str, Any], resume: str | None = None) -> dict[str, str]:
+    resume = resume or load_resume()
+    if settings.ai_provider.lower() == "gemini":
+        return _generate_with_gemini(company, contact, resume)
+    if not settings.anthropic_api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY is missing from .env")
+    from anthropic import Anthropic
+
+    prompt = _prompt(company, contact, resume)
     client = Anthropic(api_key=settings.anthropic_api_key)
     message = client.messages.create(
         model=settings.claude_model,
@@ -58,4 +64,31 @@ professional tone and a concise call to action. Sign as Dhruv Dhemare.
     required = {"professional_subject", "professional_body", "technical_subject", "technical_body"}
     if not required.issubset(result):
         raise RuntimeError("Claude response was missing required email fields.")
+    return {key: str(result[key]).strip() for key in required}
+
+
+def _generate_with_gemini(company: dict[str, Any], contact: dict[str, Any], resume: str) -> dict[str, str]:
+    if not settings.gemini_api_key:
+        raise RuntimeError("GEMINI_API_KEY is missing from .env")
+    import requests
+
+    response = requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent",
+        params={"key": settings.gemini_api_key},
+        json={
+            "contents": [{"parts": [{"text": _prompt(company, contact, resume)}]}],
+            "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"},
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    candidates = response.json().get("candidates", [])
+    text = candidates[0]["content"]["parts"][0]["text"] if candidates else ""
+    try:
+        result = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Gemini returned invalid JSON; try again.") from error
+    required = {"professional_subject", "professional_body", "technical_subject", "technical_body"}
+    if not required.issubset(result):
+        raise RuntimeError("Gemini response was missing required email fields.")
     return {key: str(result[key]).strip() for key in required}
