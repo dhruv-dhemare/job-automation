@@ -25,6 +25,9 @@ EXCLUDED_DOMAINS = {
     "ziprecruiter.com", "simplify.jobs", "remotive.com", "wantjob.in", "hiredoor.in",
     "wellfound.com", "internshala.com", "naukri.com", "cutshort.io", "instahyre.com",
     "remoteok.com", "weworkremotely.com", "jooble.org", "talent.com", "monster.com",
+    "foundit.in", "foundit.com", "builtin.com", "timesjobs.com", "shine.com",
+    "careerbuilder.com", "adzuna.com", "jobstreet.com", "dice.com", "remote.co",
+    "himalayas.app", "startup.jobs", "freshersworld.com", "apna.co", "careerjet.com",
 }
 
 
