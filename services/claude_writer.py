@@ -125,13 +125,15 @@ def _generate_with_ollama(company: dict[str, Any], contact: dict[str, Any], resu
     import requests
 
     try:
-        response = requests.post(
+        session = requests.Session()
+        session.trust_env = False
+        response = session.post(
             settings.ollama_url,
             json={"model": settings.ollama_model, "prompt": _prompt(company, contact, resume), "format": "json", "stream": False, "options": {"temperature": 0.3}},
             timeout=180,
         )
     except requests.exceptions.RequestException as error:
-        raise RuntimeError("Ollama is not running. Install Ollama, run `ollama serve`, and pull the configured model.") from error
+        raise RuntimeError(f"Could not connect to Ollama at {settings.ollama_url}: {error}") from error
     if not response.ok:
         raise RuntimeError(f"Ollama request failed ({response.status_code}): {response.text[:300]}")
     raw = response.json().get("response", "").strip()
