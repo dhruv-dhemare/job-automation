@@ -1,6 +1,7 @@
 """Claude-powered resume matching and email drafting."""
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -140,14 +141,7 @@ def _generate_with_ollama(company: dict[str, Any], contact: dict[str, Any], resu
     result = _parse_json_or_text(raw)
     required = {"professional_subject", "professional_body", "technical_subject", "technical_body"}
     if not required.issubset(result):
-        company_name = company.get("name", "the company")
-        body = raw.strip() or "I would appreciate the opportunity to discuss a software engineering internship."
-        result = {
-            "professional_subject": f"Software Engineering Internship Inquiry - {company_name}",
-            "professional_body": body,
-            "technical_subject": f"Software Engineering Internship - {company_name}",
-            "technical_body": body,
-        }
+        raise RuntimeError("Ollama did not return clean email fields. Please generate again; no draft was created.")
     return {key: str(result[key]).strip() for key in required}
 
 
@@ -164,7 +158,17 @@ def _parse_json_or_text(raw: str) -> dict[str, Any]:
                 return result if isinstance(result, dict) else {}
             except json.JSONDecodeError:
                 pass
-    return {}
+    # Small local models sometimes truncate JSON or repeat keys. Recover only
+    # the first four requested fields; never pass raw JSON into an email body.
+    result: dict[str, Any] = {}
+    for key in ("professional_subject", "professional_body", "technical_subject", "technical_body"):
+        matches = re.findall(rf'"{key}"\s*:\s*"((?:\\.|[^"\\])*)"', cleaned, flags=re.DOTALL)
+        if matches:
+            try:
+                result[key] = json.loads('"' + matches[0] + '"')
+            except json.JSONDecodeError:
+                result[key] = matches[0].replace("\\n", "\n").replace('\\"', '"')
+    return result
 
 
 def _post_with_retry(requests_module: Any, model: str, payload: dict[str, Any]) -> Any:
