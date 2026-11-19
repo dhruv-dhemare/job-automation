@@ -1,6 +1,7 @@
 """Claude-powered resume matching and email drafting."""
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -73,26 +74,14 @@ def _generate_with_gemini(company: dict[str, Any], contact: dict[str, Any], resu
     import requests
 
     model = settings.gemini_model
-    response = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        params={"key": settings.gemini_api_key},
-        json={
-            "contents": [{"parts": [{"text": _prompt(company, contact, resume)}]}],
-            "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"},
-        },
-        timeout=120,
-    )
+    payload = {
+        "contents": [{"parts": [{"text": _prompt(company, contact, resume)}]}],
+        "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"},
+    }
+    response = _post_with_retry(requests, model, payload)
     if response.status_code == 404:
         model = _available_gemini_model(requests)
-        response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-            params={"key": settings.gemini_api_key},
-            json={
-                "contents": [{"parts": [{"text": _prompt(company, contact, resume)}]}],
-                "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"},
-            },
-            timeout=120,
-        )
+        response = _post_with_retry(requests, model, payload)
     if not response.ok:
         raise RuntimeError(f"Gemini request failed ({response.status_code}): {response.text[:500]}")
     candidates = response.json().get("candidates", [])
@@ -128,3 +117,24 @@ def _available_gemini_model(requests_module: Any) -> str:
     if available:
         return sorted(available)[0]
     raise RuntimeError("This Gemini API key has no model that supports generateContent.")
+
+
+def _post_with_retry(requests_module: Any, model: str, payload: dict[str, Any]) -> Any:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    for attempt in range(3):
+        try:
+            response = requests_module.post(
+                url,
+                params={"key": settings.gemini_api_key},
+                json=payload,
+                timeout=60,
+            )
+        except requests_module.exceptions.ReadTimeout:
+            if attempt == 2:
+                raise RuntimeError("Gemini timed out three times. Try again later or use another network.")
+            time.sleep(5 * (attempt + 1))
+            continue
+        if response.status_code not in {429, 500, 503, 504} or attempt == 2:
+            return response
+        time.sleep(5 * (attempt + 1))
+    raise RuntimeError("Gemini did not respond after retries.")
