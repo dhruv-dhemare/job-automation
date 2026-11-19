@@ -41,7 +41,7 @@ def load_resume(path: Path | None = None) -> str:
 
 
 def generate_emails(company: dict[str, Any], contact: dict[str, Any], resume: str | None = None) -> dict[str, str]:
-    resume = resume or load_resume()
+    resume = (resume or load_resume())[:12000]
     if settings.ai_provider.lower() == "ollama":
         return _generate_with_ollama(company, contact, resume)
     if settings.ai_provider.lower() == "gemini":
@@ -129,7 +129,7 @@ def _generate_with_ollama(company: dict[str, Any], contact: dict[str, Any], resu
         session.trust_env = False
         response = session.post(
             settings.ollama_url,
-            json={"model": settings.ollama_model, "prompt": _prompt(company, contact, resume), "format": "json", "stream": False, "options": {"temperature": 0.3}},
+            json={"model": settings.ollama_model, "prompt": _prompt(company, contact, resume), "format": "json", "stream": False, "options": {"temperature": 0.3, "num_predict": 500, "num_ctx": 4096}},
             timeout=180,
         )
     except requests.exceptions.RequestException as error:
