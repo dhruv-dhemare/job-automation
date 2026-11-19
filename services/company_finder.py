@@ -19,7 +19,7 @@ TARGET_ROLES = (
     "java developer intern",
 )
 
-TARGET_LOCATIONS = ("Bangalore", "Bengaluru", "Pune", "remote")
+TARGET_LOCATIONS = ("Bangalore software product companies", "Pune fintech SaaS companies", "India remote-first software startups")
 EXCLUDED_DOMAINS = {
     "indeed.com", "linkedin.com", "glassdoor.com", "handshake.com", "wayup.com",
     "ziprecruiter.com", "simplify.jobs", "remotive.com", "wantjob.in", "hiredoor.in",
@@ -71,10 +71,10 @@ def _score(text: str) -> tuple[int, str]:
 
 
 def _query(location: str) -> str:
-    roles = " OR ".join(f'"{role}"' for role in TARGET_ROLES[:4])
     return (
-        f"({roles}) {location} official company careers jobs "
-        "software product fintech SaaS startup -job-board -aggregator -course -training"
+        f"{location} company websites engineering teams founders CTOs "
+        "product fintech SaaS AI startup technology company "
+        "-job-board -aggregator -job-posting -course -training"
     )
 
 
@@ -118,8 +118,11 @@ def discover_companies(count: int = 10) -> list[Company]:
         seen_domains.add(domain)
         title = result.get("title", "").strip()
         content = result.get("content", "").strip()
+        generic_titles = {"careers", "jobs", "company", "about us", "software engineer jobs"}
+        if title.lower() in generic_titles:
+            title = domain.split(".")[0].replace("-", " ").replace("_", " ").title()
         score, reason = _score(f"{title} {content}")
-        if not any(word in f"{url} {title} {content}".lower() for word in ("career", "jobs", "intern", "engineering")):
+        if not any(word in f"{url} {title} {content}".lower() for word in ("company", "software", "technology", "engineering", "fintech", "saas", "startup")):
             continue
         companies.append(
             Company(

@@ -12,6 +12,7 @@ from services.tracker import Tracker
 st.set_page_config(page_title="Internship Hunter", layout="wide")
 st.title("Personal Internship Hunter")
 st.caption(f"AI provider: {settings.ai_provider}. Gmail sending always requires your explicit approval.")
+st.info("This tool discovers companies first, then finds people at those companies for direct outreach. It does not submit job applications.")
 
 for key, default in (("contacts", {}), ("drafts", {}), ("draft_ids", {})):
     if key not in st.session_state:

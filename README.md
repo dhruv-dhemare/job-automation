@@ -1,6 +1,6 @@
 # Personal AI Internship Outreach Automation
 
-This is a deliberately small, personal tool. It discovers official company career pages for Bengaluru/Bangalore, Pune, and remote roles through Tavily, excludes common job boards, finds optional recruiting contacts through Hunter, uses Gemini/Ollama to write drafts from your resume, and creates Gmail drafts for your approval. It never sends email automatically and never invents contact details.
+This is a deliberately small, personal tool. It discovers product, fintech, SaaS, AI, and software companies in Bengaluru/Bangalore, Pune, and remote-first India through Tavily, excludes job boards, finds recruiting contacts or founders at those companies through Hunter, uses Gemini/Ollama to write drafts from your resume, and creates Gmail drafts for your approval. It does not submit applications, never sends email automatically, and never invents contact details.
 
 ## Minimum viable architecture
 
